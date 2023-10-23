@@ -4,11 +4,12 @@
 
 #define AP_SSID "XXXXXXXX"
 #define AP_PASSWD  "XXXXXXXX"
-#define AP_CHANNEL 1
+#define AP_CHANNEL 3
 #define AP_HIDDEN false
 #define AP_MAX_CONNECTION 4
 
 #define HTTP_SERVER_PORT XXXX
+#define HTTP_SERVER_ENDPOINT "XXXXXXXXXXX"
 
 #define MSG_MAX_CHARACTERS 100
 #define SERIAL_BAUD 9600
@@ -76,7 +77,7 @@ void setup()
   WiFi.softAPConfig(ip, gateway, subnet);
   WiFi.softAP(AP_SSID, AP_PASSWD, AP_CHANNEL, AP_HIDDEN, AP_MAX_CONNECTION);
   
-  server.on("/data", handleData);
+  server.on(HTTP_SERVER_ENDPOINT, handleData);
   server.begin();
 }
 

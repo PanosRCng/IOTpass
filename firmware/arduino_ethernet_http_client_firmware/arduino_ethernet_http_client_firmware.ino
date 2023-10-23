@@ -9,17 +9,17 @@
 #define SERVER_PORT XXXX
 #define AGENT "arduino-ethernet"
 #define SERIAL_BAUD 9600
+#define STARTUP_DELAY 5000
 #define CHECK_CONNECT_TIMEOUT 5000
+#define RECEIVE_TIMEOUT 900000
 
-#define RX_PIN 6
-#define TX_PIN 7
-#define ACTIVE_LED_PIN 8
+#define RX_PIN 8
+#define TX_PIN 9
+#define ACTIVE_LED_PIN A2
 
 #define CHECK_CONNECT 0
 #define ACTIVE 1
 
-
-IPAddress ip(XXX, XXX, XXX, XXX);
 byte mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 SoftwareSerial mySerial(RX_PIN, TX_PIN);
@@ -27,8 +27,9 @@ SoftwareSerial mySerial(RX_PIN, TX_PIN);
 EthernetClient client;
 String data;
 int state;
-unsigned long prev = 0;
-unsigned long now;
+unsigned long check_connect_prev = 0;
+unsigned long receive_prev = 0;
+
 
 
 void http_post(char* endpoint, String data)
@@ -73,7 +74,7 @@ void http_get(char* endpoint, String data)
     
     client.print("User-Agent: ");
     client.println(AGENT);
-    
+
     client.println("Connection: close");
     client.println();
   }
@@ -94,7 +95,19 @@ void signal_active()
 
 void check_connect()
 {
-  if(client.available() == 143)
+  unsigned long now = millis();
+
+  if( abs(now - check_connect_prev) < CHECK_CONNECT_TIMEOUT)
+  {
+    return;
+  }
+
+  if(Ethernet.begin(mac) == 0)
+  {
+    return;
+  }
+
+  if(client.available() > 0)
   { 
     signal_active();
     
@@ -102,20 +115,25 @@ void check_connect()
     return;
   }
   
-  now = millis();
-
-  if( (now - prev) < CHECK_CONNECT_TIMEOUT)
-  {
-    return;
-  }
-
-  prev = now;
   http_get(CHECK_CONNECT_ENDPOINT, "");
+
+  check_connect_prev = now;
 }
 
 
 void active()
 {
+  unsigned long receive_now = millis();
+
+  if( abs(receive_now - receive_prev) < RECEIVE_TIMEOUT)
+  {
+    digitalWrite(ACTIVE_LED_PIN, HIGH);
+  }
+  else
+  {
+    digitalWrite(ACTIVE_LED_PIN, LOW);
+  }
+
   data = "";
 
   if(mySerial.available())
@@ -127,6 +145,8 @@ void active()
       data = data.substring(0, data.length() - 1);
       
       http_post(SINK_ENDPOINT, data);
+
+      receive_prev = receive_now;
     }
   }
 }
@@ -138,8 +158,11 @@ void setup()
   pinMode(ACTIVE_LED_PIN, OUTPUT);
   
   mySerial.begin(SERIAL_BAUD); 
-  
-  Ethernet.begin(mac, ip);
+
+  check_connect_prev = CHECK_CONNECT_TIMEOUT;
+  receive_prev = RECEIVE_TIMEOUT;
+
+  delay(STARTUP_DELAY);
 
   state = CHECK_CONNECT;
 }
